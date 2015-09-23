@@ -13,12 +13,11 @@
 #define BACKLOG 10
 #define BUFF_SIZE 1024
 
-int log_fail(char* msg);
-int log_success(char* msg);
 /**
  * Binds the socket.
  * Than listen on the port
  * @return [description]
+ *
  */
 int bindListen();
 
@@ -81,15 +80,4 @@ int main(int argc, char** argv) {
     }
     close(serverSocket);
     exit(0);
-}
-
-int log_fail(char* msg) {
-    perror(msg);
-    // TODO fix log to file
-    return 0;
-}
-
-int log_success(char* msg) {
-    printf("%s\n", msg);
-    return 0;
 }
