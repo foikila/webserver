@@ -5,9 +5,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <string.h>
 
 // Our includes
 #include "status_codes.h"
+#include "logging.h"
 
 // Definitions
 #define BACKLOG 10
@@ -65,17 +67,16 @@ int main(int argc, char** argv) {
 
         if (clientSocket > 0) {
             log_success("A client connected!");
-            printf("%d", clientSocket);
         }
+
         // Takes the request from the client and puts it in the requestBuffer.
         recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
         log_success(requestBuffer);
 
         char* responseToClient = "Hello world\n";
-        printf("%lu\n", sizeof(responseToClient));
 
         // todo read from file.
-        write(clientSocket, responseToClient, sizeof(responseToClient));
+        write(clientSocket, responseToClient, strlen(responseToClient));
         close(clientSocket);
     }
     close(serverSocket);
