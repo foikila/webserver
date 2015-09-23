@@ -73,7 +73,23 @@ int main(int argc, char** argv) {
         recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
         log_success(requestBuffer);
 
-        char* responseToClient = "Hello world\n";
+        char* responseToClient;// = "Hello world\n";
+
+        // read from file.
+        FILE* file = fopen("www/index.html", "r");
+        if (file == NULL) {
+            perror("Failed to open file");
+        } else {
+            printf("READ THE FUCKING FILE:D::D:D:D\n");
+        }
+
+
+        while (fgets(responseToClient, 255, (FILE *) file) != NULL) {
+            printf("%s", responseToClient);
+        }
+
+
+        fclose(file);
 
         // todo read from file.
         write(clientSocket, responseToClient, strlen(responseToClient));
