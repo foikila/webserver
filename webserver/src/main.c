@@ -23,6 +23,13 @@
  */
 int bindListen();
 
+/**
+ * Concates two char pointers to one charpointer
+ * @param  str1
+ * @param  str2
+ */
+char* concateStr(const char* str1, const char* str2);
+
 int main(int argc, char** argv) {
     int port = 1337;
     // TODO config stuff
@@ -81,4 +88,14 @@ int main(int argc, char** argv) {
     }
     close(serverSocket);
     exit(0);
+}
+
+char* concateStr(const char* str1, const char* str2) {
+    char* strToReturn;
+
+    strToReturn = (char*)malloc(strlen(str1) + strlen(str2));
+    strcpy(strToReturn, str1);
+    strcat(strToReturn, str2);
+
+    return strToReturn;
 }
