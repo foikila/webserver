@@ -16,6 +16,13 @@
 // Definitions
 #define BACKLOG 10
 #define BUFF_SIZE 1024
+#define DEBUG 1
+
+typedef struct Response {
+    char* header;
+    char* body;
+    int size;
+} Response;
 
 /**
  * Binds the socket.
@@ -27,7 +34,9 @@ int bindListen();
 
 char* readFromFile(char* pathToFile);
 
-int main(int argc, char** argv) {
+void buildResponse(Response *res, char* body, char* contentType);
+
+int main(int argc, char *argv[]) {
     int port = 1337;
     // TODO config stuff
 
@@ -36,6 +45,8 @@ int main(int argc, char** argv) {
     socklen_t addrlen;
     char* requestBuffer = malloc(BUFF_SIZE);
     struct sockaddr_in address;
+    struct Response res;
+
     // ipv4
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
@@ -65,6 +76,7 @@ int main(int argc, char** argv) {
             log_success("Started to listen");
         }
 
+        addrlen = sizeof(address);
         if ((clientSocket = accept(serverSocket, (struct sockaddr *) &address, &addrlen)) == -1) {
             log_fail("server failed to accept.");
             exit(1);
@@ -78,15 +90,55 @@ int main(int argc, char** argv) {
         recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
         log_success(requestBuffer);
 
+        // TODO split requestBuffer to get the request uri, method etc.
+
+        // TODO pass in the request uri here instead of index.html.
+        // But only if the URI is diffrent than / or index.html
         char* responseToClient = readFromFile("www/index.html");
 
-        // todo read from file.
-        write(clientSocket, responseToClient, strlen(responseToClient));
+        buildResponse((struct Response *) &res, responseToClient, "text/html");
+
+        // TODO Here we should just join header and body and do one write()
+        write(clientSocket, res.header, strlen(res.header));
+        write(clientSocket, res.body, strlen(res.body));
+
         close(clientSocket);
     }
     close(serverSocket);
+    free(requestBuffer);
+
+    // TODO unbind serverSocket
     exit(0);
 }
+
+
+
+void buildResponse(Response *res, char* body, char* contentType) {
+    const char* header = "HTTP/1.0 %s\n"
+                         "Content-type: %s\n"
+                         "content-length: %d\n"
+                         "\n";
+
+    int bodySize = strlen(body);
+    int headerSize = strlen(header);
+
+    res->body = (char*) malloc(bodySize);
+    res->body = body;
+
+    res->header = (char*) malloc(headerSize);
+    res->size = bodySize + headerSize;
+    // Copies the header to the response header with the parameters
+    // OK, contentType and size of the response
+    sprintf(res->header, header, OK, contentType, res->size);
+
+    if (DEBUG) {
+        printf("----\n");
+        printf("HEADER: %s\n", res->header);
+        printf("BODY: %s\n", res->body);
+        printf("----\n");
+    }
+}
+
 
 char* readFromFile(char* pathToFile) {
     char* content;
