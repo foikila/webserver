@@ -24,6 +24,11 @@ typedef struct Response {
     int size;
 } Response;
 
+typedef struct Request {
+    char* method;
+    char* uri;
+} Request;
+
 /**
  * Binds the socket.
  * Than listen on the port
@@ -33,6 +38,8 @@ typedef struct Response {
 int bindListen();
 
 char* readFromFile(char* pathToFile);
+
+void buildRequest(Request *req, char* requestFromClient);
 
 void buildResponse(Response *res, char* body, char* contentType);
 
@@ -45,6 +52,7 @@ int main(int argc, char *argv[]) {
     socklen_t addrlen;
     char* requestBuffer = malloc(BUFF_SIZE);
     struct sockaddr_in address;
+    struct Request req;
     struct Response res;
 
     // ipv4
@@ -90,13 +98,33 @@ int main(int argc, char *argv[]) {
         recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
         log_success(requestBuffer);
 
-        // TODO split requestBuffer to get the request uri, method etc.
+        // builds the request struct with the request uri and method
+        buildRequest((struct Request*) &req, requestBuffer);
 
-        // TODO pass in the request uri here instead of index.html.
-        // But only if the URI is diffrent than / or index.html
-        char* responseToClient = readFromFile("www/index.html");
+        // "switches" on request method
+        if (strcmp(req.method, "GET")) {
+            char * requestFile = "index.html";
+            // TODO pass in the request uri here instead of index.html.
+            // But only if the URI is diffrent than / or index.html
+            // ^ Not sure if solved ^
+            if (!strcmp(req.uri, "/") || !strcmp(req.uri, "/index.html")) {
+                requestFile = req.uri;
+            }
+            char*path = "www/";
+            concateStr(&path, requestFile);
+            printf("%s\n", path);
+            path = "www/index.html";
+            if (DEBUG) {
+                printf("DEBUG: Requested file path: %s\n", path);
+            }
 
-        buildResponse((struct Response *) &res, responseToClient, "text/html");
+            char* responseToClient = readFromFile(path);
+            buildResponse((struct Response *) &res, responseToClient, "text/html");
+        } else if(strcmp(req.method, "HEAD")) {
+            // TODO just sent the header
+        } else {
+            // TODO send method not allowed
+        }
 
         // TODO Here we should just join header and body and do one write()
         write(clientSocket, res.header, strlen(res.header));
@@ -111,6 +139,18 @@ int main(int argc, char *argv[]) {
     exit(0);
 }
 
+void buildRequest(Request *req, char* requestFromClient) {
+    char* tooken, *firstLine;
+    firstLine = strtok(requestFromClient, "\n");
+    tooken = strtok(firstLine, " ");
+    req->method = tooken;
+    req->uri = strtok(NULL, " ");
+
+    if (DEBUG) {
+        printf("METHOD: %s\n", req->method);
+        printf("URI: %s\n", req->uri);
+    }
+}
 
 
 void buildResponse(Response *res, char* body, char* contentType) {
