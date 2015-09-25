@@ -10,7 +10,7 @@
 #include <sys/mman.h>
 
 // Our includes
-#include "status_codes.h"
+#include "statusCodes.h"
 #include "logging.h"
 
 // Definitions
