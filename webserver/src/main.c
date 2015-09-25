@@ -6,6 +6,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 
 // Our includes
 #include "status_codes.h"
@@ -23,6 +25,8 @@
  */
 int bindListen();
 
+char* readFromFile(char* pathToFile);
+
 int main(int argc, char** argv) {
     int port = 1337;
     // TODO config stuff
@@ -30,7 +34,7 @@ int main(int argc, char** argv) {
     // create socket
     int serverSocket, clientSocket;
     socklen_t addrlen;
-    char *requestBuffer = malloc(BUFF_SIZE);
+    char* requestBuffer = malloc(BUFF_SIZE);
     struct sockaddr_in address;
     // ipv4
     address.sin_family = AF_INET;
@@ -47,6 +51,7 @@ int main(int argc, char** argv) {
     // Binds the socket to the address
     if (bind(serverSocket, (struct sockaddr *) &address, sizeof(address)) == -1) {
         log_fail("Failed to bind server socket");
+        exit(1);
     } else {
         log_success("Binding server socket: success!");
     }
@@ -73,23 +78,7 @@ int main(int argc, char** argv) {
         recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
         log_success(requestBuffer);
 
-        char* responseToClient;// = "Hello world\n";
-
-        // read from file.
-        FILE* file = fopen("www/index.html", "r");
-        if (file == NULL) {
-            perror("Failed to open file");
-        } else {
-            printf("READ THE FUCKING FILE:D::D:D:D\n");
-        }
-
-
-        while (fgets(responseToClient, 255, (FILE *) file) != NULL) {
-            printf("%s", responseToClient);
-        }
-
-
-        fclose(file);
+        char* responseToClient = readFromFile("www/index.html");
 
         // todo read from file.
         write(clientSocket, responseToClient, strlen(responseToClient));
@@ -97,4 +86,31 @@ int main(int argc, char** argv) {
     }
     close(serverSocket);
     exit(0);
+}
+
+char* readFromFile(char* pathToFile) {
+    char* content;
+    int fd;
+    struct stat fileStat;
+    printf("%s\n", pathToFile);
+    fd = open(pathToFile, O_RDWR);
+
+    if (fd == -1) {
+        log_fail("Failed to open file");
+        exit(1);
+    }
+
+    if (fstat(fd, &fileStat) == -1) {
+        log_fail("Failed to get stats on file.");
+        exit(1);
+    }
+
+    if ((content = (char *) mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) {
+        log_fail("Failed to mmap file");
+        exit(1);
+    }
+
+    fprintf(stdout, "%s\n", content);
+
+    return content;
 }
