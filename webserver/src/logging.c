@@ -10,6 +10,6 @@ int log_fail(char* msg) {
 }
 
 int log_success(char* msg) {
-    printf("%s\n", msg);
+    printf("SUCCESS: %s\n", msg);
     return 0;
 }
