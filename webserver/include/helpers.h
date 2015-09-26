@@ -7,6 +7,6 @@
  * @param  str2
  * @return char*
  */
-char* concateStr(const char* str1, const char* str2);
+void concateStr(const char* str1, const char* str2, char* result);
 
 #endif

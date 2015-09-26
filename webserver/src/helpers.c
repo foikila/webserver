@@ -4,13 +4,13 @@
 
 #include "helpers.h"
 
-char* concateStr(const char* str1, const char* str2) {
-    char* strToReturn;
+void concateStr(const char* str1, const char* str2, char* result) {
+    // char* strToReturn;
 
-    // should we use realloc instead and just realloc the str1??
-    strToReturn = (char*) malloc(strlen(str1) + strlen(str2));
-    strcpy(strToReturn, str1);
-    strcat(strToReturn, str2);
+    // should we use realloc instead and just realloc the str1
+    result = (char*) malloc(strlen(str1) + strlen(str2));
+    strcpy(result, str1);
+    strcat(result, str2);
 
-    return strToReturn;
+    // return strToReturn;
 }
