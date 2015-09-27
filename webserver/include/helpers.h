@@ -2,11 +2,11 @@
 #define HELPERS_H
 
 /**
- * Combinds two strings into one string.
- * @param  str1
- * @param  str2
- * @return char*
+ * Reads a path and returns the content of it
+ *
+ * @param  pathToFile filePaht
+ * @return            content of the given filePath
  */
-void concateStr(const char* str1, const char* str2, char* result);
+char* readFromFile(char* pathToFile);
 
 #endif

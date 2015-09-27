@@ -12,6 +12,7 @@
 // Our includes
 #include "statusCodes.h"
 #include "logging.h"
+#include "helpers.h"
 
 // Definitions
 #define BACKLOG 10
@@ -37,11 +38,9 @@ typedef struct Request {
  */
 int bindListen();
 
-char* readFromFile(char* pathToFile);
-
 void buildRequest(Request *req, char* requestFromClient);
 
-void buildResponse(Response *res, char* body, char* contentType);
+void buildResponse(Response *res, char* body, char* contentType, char* responseCode);
 
 int main(int argc, char *argv[]) {
     int port = 1337;
@@ -63,15 +62,21 @@ int main(int argc, char *argv[]) {
     // Creates the serverSocket
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         log_fail("Failed to bind create socket");
+        exit(1);
     } else {
         log_success("Creating server socket: success!");
     }
+
+    // http://stackoverflow.com/questions/548879/releasing-bound-ports-on-process-exit
+    int iSetOption = 1;
+    setsockopt(serverSocket, SOL_SOCKET, SO_REUSEADDR, (char*)&iSetOption,
+        sizeof(iSetOption));
 
     // Binds the socket to the address
     if (bind(serverSocket, (struct sockaddr *) &address, sizeof(address)) == -1) {
         log_fail("Failed to bind server socket");
         exit(1);
-    } else {
+    } else if (DEBUG) {
         log_success("Binding server socket: success!");
     }
 
@@ -102,45 +107,72 @@ int main(int argc, char *argv[]) {
         buildRequest((struct Request*) &req, requestBuffer);
 
         // "switches" on request method
-        if (strcmp(req.method, "GET")) {
-            char * requestFile = "index.html";
-            // TODO pass in the request uri here instead of index.html.
-            // But only if the URI is diffrent than / or index.html
-            // ^ Not sure if solved ^
-            if (!strcmp(req.uri, "/") || !strcmp(req.uri, "/index.html")) {
+        if (strcmp(req.method, "GET") == 0) {
+            // TODO Should be configurable
+            const char* basePath = "www";
+            // TODO not sure about the size of the requestFile.
+            char* requestFile = malloc(sizeof(char*) * 30);
+
+            // No request uri given. Give default file.
+            if (strcmp(req.uri, "/") == 0) {
+                // TODO defualt file should be configurable
+                requestFile = "/index.html";
+            } else {
                 requestFile = req.uri;
             }
-            char*path = "www/";
-            concateStr(&path, requestFile);
-            printf("%s\n", path);
-            path = "www/index.html";
+
+            char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
+
+            // Combinds the request file and the requestfile to one path
+            snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
+
             if (DEBUG) {
-                printf("DEBUG: Requested file path: %s\n", path);
+                printf("DEBUG: Requested file path: %s\n", fullPath);
+            }
+            // needs to alloc to char* size. If the read fails
+            char* responseToClient = malloc(sizeof(char*));
+            responseToClient = readFromFile(fullPath);
+
+            // File not found. Sending 404
+            if (responseToClient == NULL) {
+                responseToClient = malloc(sizeof(char*) * 24);
+                responseToClient = "404 document not found.\n";
+                buildResponse((struct Response *) &res, responseToClient, "text/plain", OK);
+            } else {
+                // everything is ok. Send the requested file and ok status code
+                buildResponse((struct Response *) &res, responseToClient, "text/html", OK);
             }
 
-            char* responseToClient = readFromFile(path);
-            buildResponse((struct Response *) &res, responseToClient, "text/html");
-        } else if(strcmp(req.method, "HEAD")) {
-            // TODO just sent the header
+            // TODO Here we should just join header and body and do one write()
+            write(clientSocket, res.header, strlen(res.header));
+            write(clientSocket, res.body, strlen(res.body));
+
+            // free(responseToClient);
+            // free(res.header);
+            // free(res.body);
+
+        } else if(strcmp(req.method, "HEAD") == 0) {
+            buildResponse((struct Response *) &res, NULL, "text/html", OK);
+            write(clientSocket, res.header, strlen(res.header));
         } else {
             // TODO send method not allowed
+            buildResponse((struct Response *) &res, NULL, "text/text", METHOD_NOT_ALLOWED);
+            write(clientSocket, res.header, strlen(res.header));
         }
-
-        // TODO Here we should just join header and body and do one write()
-        write(clientSocket, res.header, strlen(res.header));
-        write(clientSocket, res.body, strlen(res.body));
 
         close(clientSocket);
     }
     close(serverSocket);
     free(requestBuffer);
-
-    // TODO unbind serverSocket
     exit(0);
 }
 
 void buildRequest(Request *req, char* requestFromClient) {
     char* tooken, *firstLine;
+
+    req->method = malloc(sizeof(char*) * 5);
+    req->uri = malloc(sizeof(char*) * 20);
+
     firstLine = strtok(requestFromClient, "\n");
     tooken = strtok(firstLine, " ");
     req->method = tooken;
@@ -153,23 +185,27 @@ void buildRequest(Request *req, char* requestFromClient) {
 }
 
 
-void buildResponse(Response *res, char* body, char* contentType) {
+void buildResponse(Response *res, char* body, char* contentType, char* responseCode) {
     const char* header = "HTTP/1.0 %s\n"
                          "Content-type: %s\n"
-                         "content-length: %d\n"
+                         "Content-length: %d\n"
                          "\n";
 
-    int bodySize = strlen(body);
+    int bodySize = 0;
     int headerSize = strlen(header);
 
-    res->body = (char*) malloc(bodySize);
-    res->body = body;
+    if (body != NULL) {
+        bodySize = strlen(body);
+        res->body = (char*) malloc(bodySize);
+        res->body = body;
+    }
 
     res->header = (char*) malloc(headerSize);
     res->size = bodySize + headerSize;
+
     // Copies the header to the response header with the parameters
-    // OK, contentType and size of the response
-    sprintf(res->header, header, OK, contentType, res->size);
+    // responseCode, contentType and size of the response
+    sprintf(res->header, header, responseCode, contentType, res->size);
 
     if (DEBUG) {
         printf("----\n");
@@ -177,32 +213,4 @@ void buildResponse(Response *res, char* body, char* contentType) {
         printf("BODY: %s\n", res->body);
         printf("----\n");
     }
-}
-
-
-char* readFromFile(char* pathToFile) {
-    char* content;
-    int fd;
-    struct stat fileStat;
-    printf("%s\n", pathToFile);
-    fd = open(pathToFile, O_RDWR);
-
-    if (fd == -1) {
-        log_fail("Failed to open file");
-        exit(1);
-    }
-
-    if (fstat(fd, &fileStat) == -1) {
-        log_fail("Failed to get stats on file.");
-        exit(1);
-    }
-
-    if ((content = (char *) mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) {
-        log_fail("Failed to mmap file");
-        exit(1);
-    }
-
-    fprintf(stdout, "%s\n", content);
-
-    return content;
 }
