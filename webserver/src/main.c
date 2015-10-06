@@ -8,6 +8,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <signal.h>
 
 // Our includes
 #include "statusCodes.h"
@@ -96,6 +97,8 @@ int main(int argc, char **argv) {
         printf("PORT: %d\n", port);
     }
 
+    // Avoid zombies.
+    signal(SIGCHLD, SIG_IGN);
 
 
     // create socket
@@ -153,70 +156,87 @@ int main(int argc, char **argv) {
             log_success("A client connected!");
         }
 
-        // Takes the request from the client and puts it in the requestBuffer.
-        recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
-        log_success(requestBuffer);
+        // Time to fork.
+        pid_t pid = fork();
 
-        // builds the request struct with the request uri and method
-        buildRequest((struct Request*) &req, requestBuffer);
+        if (pid == 0) {
+            // Child
+            close(serverSocket);
 
-        // "switches" on request method
-        if (strcmp(req.method, "GET") == 0) {
-            // TODO Should be configurable
-            const char* basePath = "www";
-            // TODO not sure about the size of the requestFile.
-            char* requestFile = malloc(sizeof(char*) * 30);
+            // Takes the request from the client and puts it in the requestBuffer.
+            recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
+            log_success(requestBuffer);
 
-            // No request uri given. Give default file.
-            if (strcmp(req.uri, "/") == 0) {
-                // TODOccess(requestBuffer); defualt file should be configurable
-                requestFile = "/index.html";
+            // builds the request struct with the request uri and method
+            buildRequest((struct Request*) &req, requestBuffer);
+
+            // "switches" on request method
+            if (strcmp(req.method, "GET") == 0) {
+                // TODO Should be configurable
+                const char* basePath = "www";
+                // TODO not sure about the size of the requestFile.
+                char* requestFile = malloc(sizeof(char*) * 30);
+
+                // No request uri given. Give default file.
+                if (strcmp(req.uri, "/") == 0) {
+                    // TODOccess(requestBuffer); defualt file should be configurable
+                    requestFile = "/index.html";
+                } else {
+                    requestFile = req.uri;
+                }
+
+                char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
+
+                // Combinds the request file and the requestfile to one path
+                snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
+
+                if (DEBUG) {
+                    printf("DEBUG: Requested file path: %s\n", fullPath);
+                }
+
+                // needs to alloc to char* size. If the read fails
+                //responseToClient = (char *) malloc(sizeof(char*));
+                responseToClient = readFromFile(fullPath);
+
+                // File not found. Sending 404
+                if (responseToClient == NULL) {
+                    responseToClient = (char *) malloc(sizeof(char*) * 24);
+                    responseToClient = "404 document not found.\n";
+                    buildResponse((struct Response *) &res, responseToClient, "text/plain", OK);
+                } else {
+                    // everything is ok. Send the requested file and ok status code
+                    buildResponse((struct Response *) &res, responseToClient, "text/html", OK);
+                }
+
+
+                // TODO Here we should just join header and body and do one write()
+                write(clientSocket, res.header, strlen(res.header));
+                write(clientSocket, res.body, strlen(res.body));
+
+
+                // free(responseToClient);
+                // free(res.header);
+                // free(res.body);
+
+            } else if(strcmp(req.method, "HEAD") == 0) {
+                buildResponse((struct Response *) &res, NULL, "text/html", OK);
+                write(clientSocket, res.header, strlen(res.header));
             } else {
-                requestFile = req.uri;
+                buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED);
+                write(clientSocket, res.header, strlen(res.header));
             }
 
-            char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
-
-            // Combinds the request file and the requestfile to one path
-            snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
-
-            if (DEBUG) {
-                printf("DEBUG: Requested file path: %s\n", fullPath);
-            }
-
-            // needs to alloc to char* size. If the read fails
-            //responseToClient = (char *) malloc(sizeof(char*));
-            responseToClient = readFromFile(fullPath);
-
-            // File not found. Sending 404
-            if (responseToClient == NULL) {
-                responseToClient = (char *) malloc(sizeof(char*) * 24);
-                responseToClient = "404 document not found.\n";
-                buildResponse((struct Response *) &res, responseToClient, "text/plain", OK);
-            } else {
-                // everything is ok. Send the requested file and ok status code
-                buildResponse((struct Response *) &res, responseToClient, "text/html", OK);
-            }
+            close(clientSocket);
+            exit(0);
 
 
-            // TODO Here we should just join header and body and do one write()
-            write(clientSocket, res.header, strlen(res.header));
-            write(clientSocket, res.body, strlen(res.body));
-
-
-            // free(responseToClient);
-            // free(res.header);
-            // free(res.body);
-
-        } else if(strcmp(req.method, "HEAD") == 0) {
-            buildResponse((struct Response *) &res, NULL, "text/html", OK);
-            write(clientSocket, res.header, strlen(res.header));
         } else {
-            buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED);
-            write(clientSocket, res.header, strlen(res.header));
+            // Parent
+            close(clientSocket);
         }
 
-        close(clientSocket);
+
+
     }
     close(serverSocket);
     free(requestBuffer);
