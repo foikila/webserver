@@ -80,6 +80,8 @@ int main(int argc, char *argv[]) {
         log_success("Binding server socket: success!");
     }
 
+    char* responseToClient = (char *) malloc(1024);
+
     // listen
     while (1) {
         if (listen(serverSocket, BACKLOG) == -1) {
@@ -115,7 +117,7 @@ int main(int argc, char *argv[]) {
 
             // No request uri given. Give default file.
             if (strcmp(req.uri, "/") == 0) {
-                // TODO defualt file should be configurable
+                // TODOccess(requestBuffer); defualt file should be configurable
                 requestFile = "/index.html";
             } else {
                 requestFile = req.uri;
@@ -129,13 +131,14 @@ int main(int argc, char *argv[]) {
             if (DEBUG) {
                 printf("DEBUG: Requested file path: %s\n", fullPath);
             }
+
             // needs to alloc to char* size. If the read fails
-            char* responseToClient = malloc(sizeof(char*));
+            //responseToClient = (char *) malloc(sizeof(char*));
             responseToClient = readFromFile(fullPath);
 
             // File not found. Sending 404
             if (responseToClient == NULL) {
-                responseToClient = malloc(sizeof(char*) * 24);
+                responseToClient = (char *) malloc(sizeof(char*) * 24);
                 responseToClient = "404 document not found.\n";
                 buildResponse((struct Response *) &res, responseToClient, "text/plain", OK);
             } else {
@@ -143,9 +146,11 @@ int main(int argc, char *argv[]) {
                 buildResponse((struct Response *) &res, responseToClient, "text/html", OK);
             }
 
+
             // TODO Here we should just join header and body and do one write()
             write(clientSocket, res.header, strlen(res.header));
             write(clientSocket, res.body, strlen(res.body));
+
 
             // free(responseToClient);
             // free(res.header);
@@ -201,7 +206,7 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     }
 
     res->header = (char*) malloc(headerSize);
-    res->size = bodySize + headerSize;
+    res->size = bodySize;
 
     // Copies the header to the response header with the parameters
     // responseCode, contentType and size of the response
