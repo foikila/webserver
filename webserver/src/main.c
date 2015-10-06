@@ -92,8 +92,10 @@ int main(int argc, char **argv) {
             break;
         }
     }
+    if (DEBUG) {
+        printf("PORT: %d\n", port);
+    }
 
-    printf("PORT: %d\n", port);
 
 
     // create socket
@@ -210,8 +212,7 @@ int main(int argc, char **argv) {
             buildResponse((struct Response *) &res, NULL, "text/html", OK);
             write(clientSocket, res.header, strlen(res.header));
         } else {
-            // TODO send method not allowed
-            buildResponse((struct Response *) &res, NULL, "text/text", METHOD_NOT_ALLOWED);
+            buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED);
             write(clientSocket, res.header, strlen(res.header));
         }
 
