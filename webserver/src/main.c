@@ -18,6 +18,7 @@
 #define BACKLOG 10
 #define BUFF_SIZE 1024
 #define DEBUG 1
+#define VERSION 0.1
 
 typedef struct Response {
     char* header;
@@ -42,9 +43,58 @@ void buildRequest(Request *req, char* requestFromClient);
 
 void buildResponse(Response *res, char* body, char* contentType, char* responseCode);
 
-int main(int argc, char *argv[]) {
+int main(int argc, char **argv) {
     int port = 1337;
     // TODO config stuff
+
+    int c;
+
+    while ((c = getopt(argc, argv, "h:p:d:l:s:v:")) != -1) {
+        switch(c) {
+            case 'h':
+                printf("HELP HERE 0.1\n");
+                exit(0);
+                break;
+            case 'p':
+                port = atoi(optarg);
+                break;
+            case 'd':
+                /*
+                    -d Run as a daemon instead of as a normal program. (if implemented - cf.
+                    Section 2.10)
+                */
+                break;
+            case 'l':
+                /* -l logfile Log to logfile. If this option is not specified, logging will be output to
+                    syslog, which is the default. (if implemented - cf. Section 2.11)
+                */
+                break;
+            case 's':
+                /*
+                    -s [fork | thread | prefork | mux] Select request handling method.
+                */
+
+
+                break;
+            case 'v':
+                printf("VERSION: %s\n", VERSION);
+                break;
+
+            case '?':
+                if (isprint(optopt)) {
+                    fprintf(stderr, "Unknown option `-%c'.\n", optopt);
+                } else {
+                    fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+                    exit(3);
+                }
+            default:
+                abort();
+            break;
+        }
+    }
+
+    printf("PORT: %d\n", port);
+
 
     // create socket
     int serverSocket, clientSocket;
