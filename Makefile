@@ -13,7 +13,7 @@ all:
 
 
 compile:
-	$(CC) -o $(PROG) -I$(INCLUDE) $(SRC)*.c
+	$(CC) -Wall -o $(PROG) -I$(INCLUDE) $(SRC)*.c
 
 
 
