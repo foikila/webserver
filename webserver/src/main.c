@@ -32,6 +32,8 @@ typedef struct Request {
     char* uri;
 } Request;
 
+
+
 /**
  * Binds the socket.
  * Than listen on the port
@@ -45,8 +47,9 @@ void buildRequest(Request *req, char* requestFromClient);
 void buildResponse(Response *res, char* body, char* contentType, char* responseCode);
 
 int main(int argc, char **argv) {
-    int port = 1337;
     // TODO config stuff
+    struct Configuration config;
+    readConfiguration((struct Configuration *) &config);
 
     int c;
 
@@ -57,7 +60,7 @@ int main(int argc, char **argv) {
                 exit(0);
                 break;
             case 'p':
-                port = atoi(optarg);
+                config.port = atoi(optarg);
                 break;
             case 'd':
                 /*
@@ -94,7 +97,7 @@ int main(int argc, char **argv) {
         }
     }
     if (DEBUG) {
-        printf("PORT: %d\n", port);
+        printf("CONFIG.PORT: %d\n", config.port);
     }
 
     // Avoid zombies.
@@ -112,7 +115,7 @@ int main(int argc, char **argv) {
     // ipv4
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
-    address.sin_port = htons(port);
+    address.sin_port = htons(config.port);
 
     // Creates the serverSocket
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -180,7 +183,7 @@ int main(int argc, char **argv) {
                 // No request uri given. Give default file.
                 if (strcmp(req.uri, "/") == 0) {
                     // TODOccess(requestBuffer); defualt file should be configurable
-                    requestFile = "/index.html";
+                    requestFile = config.index;
                 } else {
                     requestFile = req.uri;
                 }

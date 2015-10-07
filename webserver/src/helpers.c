@@ -15,6 +15,7 @@ char* readFromFile(char* pathToFile) {
 
     fd = open(pathToFile, O_RDWR);
 
+
     if (fd == -1) {
         //log_fail("READFROMFILE: Failed to open file");
         printf("READFROMFILE: FAILED TO OPEN FILE");
@@ -33,3 +34,31 @@ char* readFromFile(char* pathToFile) {
 
     return content;
 }
+
+void readConfiguration(Configuration *config) {
+    char* filename = "/home/olund/unix/webserver/config.conf";
+    char* content = readFromFile(filename);
+
+    /*char* tooken, *firstLine;
+
+    firstLine = strtok(content, "\n");*/
+
+    printf("\n%s\n\n", content);
+    //printf("fL: %s\n", firstLine);
+
+    config->dir = "/home/olund/unix/webserver";
+    config->port = 1337;
+    config->logfile = "/var/log/test";
+    config->requestHandlingMethod = "FORK";
+    config->index = "/index.html";
+}
+/*
+char* tooken, *firstLine;
+
+req->method = malloc(sizeof(char*) * 5);
+req->uri = malloc(sizeof(char*) * 20);
+
+firstLine = strtok(requestFromClient, "\n");
+tooken = strtok(firstLine, " ");
+req->method = tooken;
+req->uri = strtok(NULL, " ");*/
