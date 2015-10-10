@@ -44,7 +44,7 @@ char* getLastModified(char* pathToFile);
 int main(int argc, char **argv) {
     // TODO config stuff
     struct Configuration config;
-    readConfiguration((struct Configuration *) &config);
+    readConfiguration((struct Configuration *) &config, ".lab3-config");
     int c;
 
     while ((c = getopt(argc, argv, "hp:dlsv")) != -1) {
@@ -245,7 +245,9 @@ char* getLastModified(char* pathToFile) {
     char *lastModified = (char *) malloc(sizeof(char) * 30);
     struct stat fileStat;
     if (fstat(fd, &fileStat) == -1) {
-        printf("Bullshit: Failed to get stats on file.\n");
+        if (DEBUG) {
+            printf("getLastModified: Failed to get stats on file.\n");
+        }
         return NULL;
     } else {
         strftime(lastModified, 30, "%a, %d %b %Y %H:%M:%S", localtime(&fileStat.st_mtime));

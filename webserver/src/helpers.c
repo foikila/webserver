@@ -17,18 +17,17 @@ char* readFromFile(char* pathToFile) {
     fd = open(pathToFile, O_RDWR);
 
     if (fd == -1) {
-        //log_fail("READFROMFILE: Failed to open file");
-        printf("READFROMFILE: FAILED TO OPEN FILE");
+        printf("readFromFile: FAILED TO OPEN FILE: %s\n", pathToFile);
         return NULL;
     }
 
     if (fstat(fd, &fileStat) == -1) {
-        log_fail("READFROMFILE: Failed to get stats on file.");
+        log_fail("readFromFile: Failed to get stats on file.\n");
         exit(1);
     }
 
     if ((content = (char *) mmap(0, fileStat.st_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0)) == MAP_FAILED) {
-        log_fail("READFROMFILE: Failed to mmap file");
+        log_fail("readFromFile: Failed to mmap file\n");
         exit(1);
     }
 
@@ -37,47 +36,40 @@ char* readFromFile(char* pathToFile) {
     return content;
 }
 
-void readConfiguration(Configuration *config) {
-    /*char* filename = "config.conf";
-    char* content = readFromFile(filename);
+void readConfiguration(Configuration* config, char* configFileName) {
+    char* content = readFromFile(configFileName);
+
+    if (content == NULL) {
+        printf("Config file not found.\n");
+        exit(3);
+    }
 
     char* temp = malloc(strlen(content) + 1);
     strncpy(temp, content, strlen(content));
+    char* token;
 
-    printf("\n%s\n\n", temp);*/
-    /*char *dir, *index, *log, *method;
-    int port;
+    // Step 1: DIR
+    token = strtok(temp, "=");
+    token = strtok(NULL, "\n");
+    config->dir = token;
 
-    char* split;*/
-    //char *name;
-    /*char* point;
-    point = strtok(temp, "=");
-    int i = 0;
-    while (point != NULL) {
+    // Step 2: PORT
+    token = strtok(NULL, "=");
+    token = strtok(NULL, "\n");
+    config->port = atoi(token);
 
-        printf("%d \t", i);
+    // Step 3 Index
+    token = strtok(NULL, "=");
+    token = strtok(NULL, "\n");
+    config->index = token;
 
-        if (i == 1) {
-            config->dir = point;
-        } else if (i == 2) {
-            config->port = atoi(point);
-        } else if (i == 3) {
-            config->index = point;
-        } else if (i == 4) {
-            config->logfile = point;
-        } else if (i == 5) {
-            config->requestHandlingMethod = point;
-        }
+    // Step 4 LOG:
+    token = strtok(NULL, "=");
+    token = strtok(NULL, "\n");
+    config->logfile = token;
 
-        printf("%s\n", point);
-        point = strtok(NULL, "=");
-        //point = strtok(NULL, "\n");
-        i++;
-    }*/
-
-    config->dir = "/home/olund/unix/webserver";
-    config->port = 1337;
-    config->logfile = "/var/log/test";
-    config->requestHandlingMethod = "FORK";
-    config->index = "/index.html";
+    // Step 5 Method
+    token = strtok(NULL, "=");
+    token = strtok(NULL, "\n");
+    config->requestHandlingMethod = token;
 }

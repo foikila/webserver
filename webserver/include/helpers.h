@@ -18,6 +18,6 @@ typedef struct Configuration {
 char* readFromFile(char* pathToFile);
 
 
-void readConfiguration(Configuration *config);
+void readConfiguration(Configuration* config, char* configFileName);
 
 #endif
