@@ -198,16 +198,13 @@ int main(int argc, char **argv) {
             // "switches" on request method
             if (strcmp(req.method, "GET") == 0) {
 
-                // needs to alloc to char* size. If the read fails
-                //responseToClient = (char *) malloc(sizeof(char*));
                 responseToClient = readFromFile(fullPath);
-
 
                 // File not found. Sending 404
                 if (responseToClient == NULL) {
                     responseToClient = (char *) malloc(sizeof(char*) * 24);
                     responseToClient = "404 document not found.\n";
-                    buildResponse((struct Response *) &res, responseToClient, "text/plain", OK, fullPath);
+                    buildResponse((struct Response *) &res, responseToClient, "text/plain", FILE_NOT_FOUND, fullPath);
                 } else {
                     // everything is ok. Send the requested file and ok status code
                     buildResponse((struct Response *) &res, responseToClient, "text/html", OK, fullPath);
@@ -217,10 +214,6 @@ int main(int argc, char **argv) {
                 // TODO Here we should just join header and body and do one write()
                 write(clientSocket, res.header, strlen(res.header));
                 write(clientSocket, res.body, strlen(res.body));
-
-                // free(responseToClient);
-                // free(res.header);
-                // free(res.body);
 
             } else if(strcmp(req.method, "HEAD") == 0) {
                 buildResponse((struct Response *) &res, NULL, "text/html", OK, fullPath);
@@ -252,8 +245,8 @@ char* getLastModified(char* pathToFile) {
     char *lastModified = (char *) malloc(sizeof(char) * 30);
     struct stat fileStat;
     if (fstat(fd, &fileStat) == -1) {
-        log_fail("Bullshit: Failed to get stats on file.\n");
-        exit(1);
+        printf("Bullshit: Failed to get stats on file.\n");
+        return NULL;
     } else {
         strftime(lastModified, 30, "%a, %d %b %Y %H:%M:%S", localtime(&fileStat.st_mtime));
     }
@@ -289,6 +282,11 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     int bodySize = 0;
     int headerSize = strlen(header);
     char* lastModified = getLastModified(pathToFile);
+
+    if (lastModified == NULL) {
+        responseCode = FILE_NOT_FOUND;
+        lastModified = "0";
+    }
 
     if (body != NULL) {
         bodySize = strlen(body);
