@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#include <syslog.h>
 
 // Our includes
 #include "statusCodes.h"
@@ -20,7 +21,7 @@
 // Definitions
 #define BACKLOG 10
 #define BUFF_SIZE 1024
-#define DEBUG 1
+#define DEBUG 0
 #define VERSION 0.1
 
 typedef struct Response {
@@ -41,16 +42,18 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
 
 char* getLastModified(char* pathToFile);
 
+void daemononize();
+
 int main(int argc, char **argv) {
-    // TODO config stuff
     struct Configuration config;
     readConfiguration((struct Configuration *) &config, ".lab3-config");
     int c;
+    printf("uberServer: started!\n");
 
     while ((c = getopt(argc, argv, "hp:dlsv")) != -1) {
         switch(c) {
             case 'h':
-                printf("HELP HERE 0.1\n");
+                printf("HELP HERE\n");
                 exit(0);
                 break;
             case 'p':
@@ -58,11 +61,9 @@ int main(int argc, char **argv) {
                 break;
             case 'd':
                 /*
-                    -d Run as a daemon instead of as a normal program. (if implemented - cf.
-                    Section 2.10)
+                    -d Run as a daemon instead of as a normal program.
                 */
-                printf("Run as deamon: NOT IMPLEMENTED\n");
-                exit(3);
+                daemononize();
                 break;
             case 'l':
                 /* -l logfile Log to logfile. If this option is not specified, logging will be output to
@@ -122,7 +123,7 @@ int main(int argc, char **argv) {
     if ((serverSocket = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         log_fail("Failed to bind create socket");
         exit(1);
-    } else {
+    } else if (DEBUG) {
         log_success("Creating server socket: success!");
     }
 
@@ -146,7 +147,7 @@ int main(int argc, char **argv) {
         if (listen(serverSocket, BACKLOG) == -1) {
             log_fail("server failed to listen.");
             exit(1);
-        } else {
+        } else if (DEBUG) {
             log_success("Started to listen");
         }
 
@@ -156,7 +157,7 @@ int main(int argc, char **argv) {
             exit(1);
         }
 
-        if (clientSocket > 0) {
+        if (clientSocket > 0 && DEBUG) {
             log_success("A client connected!");
         }
 
@@ -169,7 +170,10 @@ int main(int argc, char **argv) {
 
             // Takes the request from the client and puts it in the requestBuffer.
             recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
-            log_success(requestBuffer);
+
+            if (DEBUG) {
+                log_success(requestBuffer);
+            }
 
             // builds the request struct with the request uri and method
             buildRequest((struct Request*) &req, requestBuffer);
@@ -200,7 +204,7 @@ int main(int argc, char **argv) {
             if (strcmp(req.method, "GET") == 0) {
 
                 responseToClient = readFromFile(fullPath);
-
+                printf("Response: %s\n", responseToClient);
                 // File not found. Sending 404
                 if (responseToClient == NULL) {
                     responseToClient = (char *) malloc(sizeof(char*) * 24);
@@ -310,4 +314,49 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
         printf("BODY: %s\n", res->body);
         printf("----\n");
     }
+}
+
+void daemononize() {
+    pid_t pid;
+
+    pid = fork();
+
+    if (pid < 0) {
+        exit(3);
+    }
+
+    if (pid > 0) {
+        exit(0);
+    }
+
+    if (setsid() < 0) {
+        exit(3);
+    }
+
+    signal(SIGCHLD, SIG_IGN);
+    signal(SIGHUP, SIG_IGN);
+
+    pid = fork();
+    if (pid < 0) {
+        exit(3);
+    }
+
+    if (pid > 0) {
+        exit(0);
+    }
+
+    umask(0);
+
+    int n;
+    for (n = sysconf(_SC_OPEN_MAX); n > 0; n--) {
+        close(n);
+    }
+
+    // Turn of IO.
+    close(STDIN_FILENO);
+    close(STDOUT_FILENO);
+    close(STDERR_FILENO);
+
+    openlog("uberServer", LOG_PID, LOG_DAEMON);
+    syslog(LOG_NOTICE, "DEAMON STARTED");
 }

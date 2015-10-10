@@ -17,7 +17,7 @@ char* readFromFile(char* pathToFile) {
     fd = open(pathToFile, O_RDWR);
 
     if (fd == -1) {
-        printf("readFromFile: FAILED TO OPEN FILE: %s\n", pathToFile);
+        // File did not exist.
         return NULL;
     }
 
