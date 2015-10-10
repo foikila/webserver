@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <signal.h>
+#include <ctype.h>
+#include <time.h>
 
 // Our includes
 #include "statusCodes.h"
@@ -25,6 +27,7 @@ typedef struct Response {
     char* header;
     char* body;
     int size;
+    char* lastModified;
 } Response;
 
 typedef struct Request {
@@ -32,25 +35,16 @@ typedef struct Request {
     char* uri;
 } Request;
 
-
-
-/**
- * Binds the socket.
- * Than listen on the port
- * @return [description]
- *
- */
-int bindListen();
-
 void buildRequest(Request *req, char* requestFromClient);
 
-void buildResponse(Response *res, char* body, char* contentType, char* responseCode);
+void buildResponse(Response *res, char* body, char* contentType, char* responseCode, char* pathToFile);
+
+char* getLastModified(char* pathToFile);
 
 int main(int argc, char **argv) {
     // TODO config stuff
     struct Configuration config;
     readConfiguration((struct Configuration *) &config);
-
     int c;
 
     while ((c = getopt(argc, argv, "h:p:d:l:s:v:")) != -1) {
@@ -67,21 +61,25 @@ int main(int argc, char **argv) {
                     -d Run as a daemon instead of as a normal program. (if implemented - cf.
                     Section 2.10)
                 */
+                printf("Run as deamon: NOT IMPLEMENTED\n");
+                exit(3);
                 break;
             case 'l':
                 /* -l logfile Log to logfile. If this option is not specified, logging will be output to
                     syslog, which is the default. (if implemented - cf. Section 2.11)
                 */
+                printf("Log: NOT IMPLEMENTED\n");
+                exit(3);
                 break;
             case 's':
                 /*
                     -s [fork | thread | prefork | mux] Select request handling method.
                 */
-
-
+                printf("Only FORK implemented\n");
+                exit(3);
                 break;
             case 'v':
-                printf("VERSION: %s\n", VERSION);
+                printf("VERSION: %f\n", VERSION);
                 break;
 
             case '?':
@@ -96,8 +94,10 @@ int main(int argc, char **argv) {
             break;
         }
     }
+
     if (DEBUG) {
-        printf("CONFIG.PORT: %d\n", config.port);
+        printf("\n\nConfiguration:\n PORT: %d\n DIR: %s\n INDEX: %s\n LOG: %s\n METHOD: %s\n\n", config.port,
+            config.dir, config.index, config.logfile, config.requestHandlingMethod);
     }
 
     // Avoid zombies.
@@ -173,42 +173,44 @@ int main(int argc, char **argv) {
             // builds the request struct with the request uri and method
             buildRequest((struct Request*) &req, requestBuffer);
 
+            // TODO Should be configurable
+            const char* basePath = "www";
+            // TODO not sure about the size of the requestFile.
+            char* requestFile = malloc(sizeof(char*) * 30);
+
+            // No request uri given. Give default file.
+            if (strcmp(req.uri, "/") == 0) {
+                // TODOccess(requestBuffer); defualt file should be configurable
+                requestFile = config.index;
+            } else {
+                requestFile = req.uri;
+            }
+
+            char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
+
+            // Combinds the request file and the requestfile to one path
+            snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
+
+            if (DEBUG) {
+                printf("DEBUG: Requested file path: %s\n", fullPath);
+            }
+
             // "switches" on request method
             if (strcmp(req.method, "GET") == 0) {
-                // TODO Should be configurable
-                const char* basePath = "www";
-                // TODO not sure about the size of the requestFile.
-                char* requestFile = malloc(sizeof(char*) * 30);
-
-                // No request uri given. Give default file.
-                if (strcmp(req.uri, "/") == 0) {
-                    // TODOccess(requestBuffer); defualt file should be configurable
-                    requestFile = config.index;
-                } else {
-                    requestFile = req.uri;
-                }
-
-                char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
-
-                // Combinds the request file and the requestfile to one path
-                snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
-
-                if (DEBUG) {
-                    printf("DEBUG: Requested file path: %s\n", fullPath);
-                }
 
                 // needs to alloc to char* size. If the read fails
                 //responseToClient = (char *) malloc(sizeof(char*));
                 responseToClient = readFromFile(fullPath);
 
+
                 // File not found. Sending 404
                 if (responseToClient == NULL) {
                     responseToClient = (char *) malloc(sizeof(char*) * 24);
                     responseToClient = "404 document not found.\n";
-                    buildResponse((struct Response *) &res, responseToClient, "text/plain", OK);
+                    buildResponse((struct Response *) &res, responseToClient, "text/plain", OK, fullPath);
                 } else {
                     // everything is ok. Send the requested file and ok status code
-                    buildResponse((struct Response *) &res, responseToClient, "text/html", OK);
+                    buildResponse((struct Response *) &res, responseToClient, "text/html", OK, fullPath);
                 }
 
 
@@ -216,16 +218,15 @@ int main(int argc, char **argv) {
                 write(clientSocket, res.header, strlen(res.header));
                 write(clientSocket, res.body, strlen(res.body));
 
-
                 // free(responseToClient);
                 // free(res.header);
                 // free(res.body);
 
             } else if(strcmp(req.method, "HEAD") == 0) {
-                buildResponse((struct Response *) &res, NULL, "text/html", OK);
+                buildResponse((struct Response *) &res, NULL, "text/html", OK, fullPath);
                 write(clientSocket, res.header, strlen(res.header));
             } else {
-                buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED);
+                buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED, fullPath);
                 write(clientSocket, res.header, strlen(res.header));
             }
 
@@ -246,12 +247,25 @@ int main(int argc, char **argv) {
     exit(0);
 }
 
+char* getLastModified(char* pathToFile) {
+    int fd = open(pathToFile, O_RDWR);
+    char *lastModified = (char *) malloc(sizeof(char) * 30);
+    struct stat fileStat;
+    if (fstat(fd, &fileStat) == -1) {
+        log_fail("Bullshit: Failed to get stats on file.\n");
+        exit(1);
+    } else {
+        strftime(lastModified, 30, "%a, %d %b %Y %H:%M:%S", localtime(&fileStat.st_mtime));
+    }
+
+    return lastModified;
+}
+
 void buildRequest(Request *req, char* requestFromClient) {
     char* tooken, *firstLine;
 
     req->method = malloc(sizeof(char*) * 5);
     req->uri = malloc(sizeof(char*) * 20);
-
     firstLine = strtok(requestFromClient, "\n");
     tooken = strtok(firstLine, " ");
     req->method = tooken;
@@ -264,14 +278,17 @@ void buildRequest(Request *req, char* requestFromClient) {
 }
 
 
-void buildResponse(Response *res, char* body, char* contentType, char* responseCode) {
+void buildResponse(Response *res, char* body, char* contentType, char* responseCode, char* pathToFile) {
     const char* header = "HTTP/1.0 %s\n"
                          "Content-type: %s\n"
                          "Content-length: %d\n"
+                         "Last-Modified: %s\n"
+                         "Server: %s\n"
                          "\n";
 
     int bodySize = 0;
     int headerSize = strlen(header);
+    char* lastModified = getLastModified(pathToFile);
 
     if (body != NULL) {
         bodySize = strlen(body);
@@ -282,9 +299,10 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     res->header = (char*) malloc(headerSize);
     res->size = bodySize;
 
+
     // Copies the header to the response header with the parameters
-    // responseCode, contentType and size of the response
-    sprintf(res->header, header, responseCode, contentType, res->size);
+    // responseCode, contentType, size of the response, last-modified and the server name.
+    sprintf(res->header, header, responseCode, contentType, res->size, lastModified, "uberServer");
 
     if (DEBUG) {
         printf("----\n");

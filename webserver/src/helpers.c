@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "helpers.h"
+#include "logging.h"
 
 char* readFromFile(char* pathToFile) {
     char* content = (char *)malloc(sizeof(char) * 4096);
@@ -14,7 +15,6 @@ char* readFromFile(char* pathToFile) {
     struct stat fileStat;
 
     fd = open(pathToFile, O_RDWR);
-
 
     if (fd == -1) {
         //log_fail("READFROMFILE: Failed to open file");
@@ -32,19 +32,48 @@ char* readFromFile(char* pathToFile) {
         exit(1);
     }
 
+    //close(pathToFile);
+
     return content;
 }
 
 void readConfiguration(Configuration *config) {
-    char* filename = "/home/olund/unix/webserver/config.conf";
+    /*char* filename = "config.conf";
     char* content = readFromFile(filename);
 
-    /*char* tooken, *firstLine;
+    char* temp = malloc(strlen(content) + 1);
+    strncpy(temp, content, strlen(content));
 
-    firstLine = strtok(content, "\n");*/
+    printf("\n%s\n\n", temp);*/
+    /*char *dir, *index, *log, *method;
+    int port;
 
-    printf("\n%s\n\n", content);
-    //printf("fL: %s\n", firstLine);
+    char* split;*/
+    //char *name;
+    /*char* point;
+    point = strtok(temp, "=");
+    int i = 0;
+    while (point != NULL) {
+
+        printf("%d \t", i);
+
+        if (i == 1) {
+            config->dir = point;
+        } else if (i == 2) {
+            config->port = atoi(point);
+        } else if (i == 3) {
+            config->index = point;
+        } else if (i == 4) {
+            config->logfile = point;
+        } else if (i == 5) {
+            config->requestHandlingMethod = point;
+        }
+
+        printf("%s\n", point);
+        point = strtok(NULL, "=");
+        //point = strtok(NULL, "\n");
+        i++;
+    }*/
 
     config->dir = "/home/olund/unix/webserver";
     config->port = 1337;
@@ -52,13 +81,3 @@ void readConfiguration(Configuration *config) {
     config->requestHandlingMethod = "FORK";
     config->index = "/index.html";
 }
-/*
-char* tooken, *firstLine;
-
-req->method = malloc(sizeof(char*) * 5);
-req->uri = malloc(sizeof(char*) * 20);
-
-firstLine = strtok(requestFromClient, "\n");
-tooken = strtok(firstLine, " ");
-req->method = tooken;
-req->uri = strtok(NULL, " ");*/
