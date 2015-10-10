@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
     readConfiguration((struct Configuration *) &config);
     int c;
 
-    while ((c = getopt(argc, argv, "h:p:d:l:s:v:")) != -1) {
+    while ((c = getopt(argc, argv, "hp:dlsv")) != -1) {
         switch(c) {
             case 'h':
                 printf("HELP HERE 0.1\n");
@@ -80,6 +80,7 @@ int main(int argc, char **argv) {
                 break;
             case 'v':
                 printf("VERSION: %f\n", VERSION);
+                exit(0);
                 break;
 
             case '?':
