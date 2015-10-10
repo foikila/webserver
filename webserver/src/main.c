@@ -210,7 +210,6 @@ int main(int argc, char **argv) {
                     buildResponse((struct Response *) &res, responseToClient, "text/html", OK, fullPath);
                 }
 
-
                 // TODO Here we should just join header and body and do one write()
                 write(clientSocket, res.header, strlen(res.header));
                 write(clientSocket, res.body, strlen(res.body));
@@ -283,7 +282,7 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     int headerSize = strlen(header);
     char* lastModified = getLastModified(pathToFile);
 
-    if (lastModified == NULL) {
+    if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {
         responseCode = FILE_NOT_FOUND;
         lastModified = "0";
     }
