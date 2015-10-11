@@ -48,13 +48,15 @@ int main(int argc, char **argv) {
     struct Configuration config;
     readConfiguration((struct Configuration *) &config, ".lab3-config");
     int c;
-    printf("uberServer: started!\n");
 
     while ((c = getopt(argc, argv, "hp:dlsv")) != -1) {
         switch(c) {
             case 'h':
-                printf("HELP HERE\n");
-                exit(0);
+                printf("Usage: webserver_main [-h] [-p] [-d]\n");
+                printf("h\tDisplay help text\np\tUse to set the port\n");
+                printf("d\tRun as a daemon instead of as a normal program\n");
+
+                exit(0);[-l]
                 break;
             case 'p':
                 config.port = atoi(optarg);
@@ -96,6 +98,8 @@ int main(int argc, char **argv) {
             break;
         }
     }
+
+    printf("uberServer: started on port %d!\n", config.port);
 
     if (DEBUG) {
         printf("\n\nConfiguration:\n PORT: %d\n DIR: %s\n INDEX: %s\n LOG: %s\n METHOD: %s\n\n", config.port,
@@ -289,7 +293,7 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     int headerSize = strlen(header);
     char* lastModified = getLastModified(pathToFile);
 
-    if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {
+    if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {[-l]
         responseCode = FILE_NOT_FOUND;
         lastModified = "0";
     }
