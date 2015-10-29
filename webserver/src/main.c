@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
                 printf("h\tDisplay help text\np\tUse to set the port\n");
                 printf("d\tRun as a daemon instead of as a normal program\n");
 
-                exit(0);[-l]
+                exit(0);
                 break;
             case 'p':
                 config.port = atoi(optarg);
@@ -293,7 +293,7 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     int headerSize = strlen(header);
     char* lastModified = getLastModified(pathToFile);
 
-    if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {[-l]
+    if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {
         responseCode = FILE_NOT_FOUND;
         lastModified = "0";
     }
