@@ -22,7 +22,7 @@
 #define BACKLOG 10
 #define BUFF_SIZE 1024
 #define DEBUG 0
-#define VERSION 1.0
+#define VERSION 1.1
 
 typedef struct Response {
     char* header;
@@ -40,7 +40,7 @@ void buildRequest(Request *req, char* requestFromClient);
 
 void buildResponse(Response *res, char* body, char* contentType, char* responseCode, char* pathToFile);
 
-char* getLastModified(char* pathToFile);
+void getLastModified(char* pathToFile, char* dest);
 
 void daemononize();
 
@@ -248,20 +248,18 @@ int main(int argc, char **argv) {
     exit(0);
 }
 
-char* getLastModified(char* pathToFile) {
+void getLastModified(char* pathToFile, char* dest) {
     int fd = open(pathToFile, O_RDWR);
-    char *lastModified = (char *) malloc(sizeof(char) * 30);
+
     struct stat fileStat;
+
     if (fstat(fd, &fileStat) == -1) {
         if (DEBUG) {
             printf("getLastModified: Failed to get stats on file.\n");
         }
-        return NULL;
     } else {
-        strftime(lastModified, 30, "%a, %d %b %Y %H:%M:%S", localtime(&fileStat.st_mtime));
+        strftime(dest, 30, "%a, %d %b %Y %H:%M:%S", localtime(&fileStat.st_mtime));
     }
-
-    return lastModified;
 }
 
 void buildRequest(Request *req, char* requestFromClient) {
@@ -291,7 +289,10 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
 
     int bodySize = 0;
     int headerSize = strlen(header);
-    char* lastModified = getLastModified(pathToFile);
+    
+    char* lastModified = (char *) malloc(sizeof(char) + 30);
+
+    getLastModified(pathToFile, lastModified);
 
     if (lastModified == NULL && strcmp(responseCode, NOT_IMPLEMENTED) != 0) {
         responseCode = FILE_NOT_FOUND;
@@ -307,10 +308,11 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
     res->header = (char*) malloc(headerSize);
     res->size = bodySize;
 
-
     // Copies the header to the response header with the parameters
     // responseCode, contentType, size of the response, last-modified and the server name.
     sprintf(res->header, header, responseCode, contentType, res->size, lastModified, "uberServer");
+
+    free(lastModified);
 
     if (DEBUG) {
         printf("----\n");
