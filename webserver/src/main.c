@@ -22,12 +22,12 @@
 #define BACKLOG 10
 #define BUFF_SIZE 1024
 #define DEBUG 1
-#define VERSION 1.1
+#define VERSION 1.2
 
 typedef struct Response {
     char* header;
     char* body;
-    int size;
+    size_t size;
     char* lastModified;
 } Response;
 
@@ -44,11 +44,11 @@ void getLastModified(char* pathToFile, char* dest);
 
 void daemononize();
 
+void processChild(int socket, char *buffer, Configuration configuration);
+
 int main(int argc, char **argv) {
     struct Configuration config;
     int port = -1;
-
-
     int c;
 
     while ((c = getopt(argc, argv, "hp:c:dlsv")) != -1) {
@@ -126,8 +126,7 @@ int main(int argc, char **argv) {
     socklen_t addrlen;
     char* requestBuffer = malloc(BUFF_SIZE);
     struct sockaddr_in address;
-    struct Request req;
-    struct Response res;
+
 
     // ipv4
     address.sin_family = AF_INET;
@@ -155,8 +154,6 @@ int main(int argc, char **argv) {
         log_success("Binding server socket: success!");
     }
 
-    char* responseToClient = (char *) malloc(1024);
-
     // listen
     while (1) {
         if (listen(serverSocket, BACKLOG) == -1) {
@@ -183,77 +180,76 @@ int main(int argc, char **argv) {
             // Child
             close(serverSocket);
 
-            // Takes the request from the client and puts it in the requestBuffer.
-            recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
-
-            if (DEBUG) {
-                log_success(requestBuffer);
-            }
-
-            // builds the request struct with the request uri and method
-            buildRequest((struct Request*) &req, requestBuffer);
-
-            // TODO not sure about the size of the requestFile.
-            char* requestFile = malloc(sizeof(char*) * 30);
-
-            // No request uri given. Give default file.
-            if (strcmp(req.uri, "/") == 0) {
-                // TODOccess(requestBuffer); defualt file should be configurable
-                requestFile = config.index;
-            } else {
-                requestFile = req.uri;
-            }
-
-            char* fullPath = malloc(strlen(config.dir) + strlen(requestFile) + 1);
-
-            // Combinds the request file and the requestfile to one path
-            snprintf(fullPath, strlen(config.dir) + strlen(requestFile) + 1, "%s%s", config.dir, requestFile);
-
-            if (DEBUG) {
-                printf("DEBUG: Requested file path: %s\n", fullPath);
-            }
-
-            // "switches" on request method
-            if (strcmp(req.method, "GET") == 0) {
-
-                responseToClient = readFromFile(fullPath);
-                printf("Response: %s\n", responseToClient);
-                // File not found. Sending 404
-                if (responseToClient == NULL) {
-                    responseToClient = (char *) malloc(sizeof(char*) * 24);
-                    responseToClient = "404 document not found.\n";
-                    buildResponse((struct Response *) &res, responseToClient, "text/plain", FILE_NOT_FOUND, fullPath);
-                } else {
-                    // everything is ok. Send the requested file and ok status code
-                    buildResponse((struct Response *) &res, responseToClient, "text/html", OK, fullPath);
-                }
-
-                // TODO Here we should just join header and body and do one write()
-                write(clientSocket, res.header, strlen(res.header));
-                write(clientSocket, res.body, strlen(res.body));
-
-            } else if(strcmp(req.method, "HEAD") == 0) {
-                buildResponse((struct Response *) &res, NULL, "text/html", OK, fullPath);
-                write(clientSocket, res.header, strlen(res.header));
-            } else {
-                buildResponse((struct Response *) &res, NULL, "text/text", NOT_IMPLEMENTED, fullPath);
-                write(clientSocket, res.header, strlen(res.header));
-            }
-
-            close(clientSocket);
-            exit(0);
-
-
+            processChild(clientSocket, requestBuffer, config);
         } else {
             // Parent
             close(clientSocket);
         }
 
-
-
     }
-    close(serverSocket);
-    free(requestBuffer);
+}
+
+void processChild(int clientSocket, char* requestBuffer, Configuration config) {
+    struct Request req;
+    struct Response res;
+    char* responseToClient;
+
+    // Takes the request from the client and puts it in the requestBuffer.
+    recv(clientSocket, requestBuffer, BUFF_SIZE, 0);
+
+    if (DEBUG) {
+        log_success(requestBuffer);
+    }
+
+    // builds the request struct with the request uri and method
+    buildRequest(&req, requestBuffer);
+
+    // TODO not sure about the size of the requestFile.
+    char* requestFile;
+
+    // No request uri given. Give default file.
+    if (strcmp(req.uri, "/") == 0) {
+        requestFile = config.index;
+    } else {
+        requestFile = req.uri;
+    }
+
+    char* fullPath = malloc(strlen(config.dir) + strlen(requestFile) + 1);
+
+    // Combinds the request file and the requestfile to one path
+    snprintf(fullPath, strlen(config.dir) + strlen(requestFile) + 1, "%s%s", config.dir, requestFile);
+
+    if (DEBUG) {
+        printf("DEBUG: Requested file path: %s\n", fullPath);
+    }
+
+    // "switches" on request method
+    if (strcmp(req.method, "GET") == 0) {
+
+        responseToClient = readFromFile(fullPath);
+        printf("Response: %s\n", responseToClient);
+        // File not found. Sending 404
+        if (responseToClient == NULL) {
+            responseToClient = "404 document not found.\n";
+            buildResponse(&res, responseToClient, "text/plain", FILE_NOT_FOUND, fullPath);
+        } else {
+            // everything is ok. Send the requested file and ok status code
+            buildResponse(&res, responseToClient, "text/html", OK, fullPath);
+        }
+
+        // TODO Here we should just join header and body and do one write()
+        write(clientSocket, res.header, strlen(res.header));
+        write(clientSocket, res.body, strlen(res.body));
+
+    } else if(strcmp(req.method, "HEAD") == 0) {
+        buildResponse(&res, NULL, "text/html", OK, fullPath);
+        write(clientSocket, res.header, strlen(res.header));
+    } else {
+        buildResponse(&res, NULL, "text/text", NOT_IMPLEMENTED, fullPath);
+        write(clientSocket, res.header, strlen(res.header));
+    }
+
+    close(clientSocket);
     exit(0);
 }
 
@@ -296,8 +292,8 @@ void buildResponse(Response *res, char* body, char* contentType, char* responseC
                          "Server: %s\n"
                          "\n";
 
-    int bodySize = 0;
-    int headerSize = strlen(header);
+    size_t bodySize = 0;
+    size_t headerSize = strlen(header);
     
     char* lastModified = (char *) malloc(sizeof(char) + 30);
 
