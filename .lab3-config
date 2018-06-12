@@ -1,4 +1,4 @@
-DIR=/home/olund/unix/webserver/test
+DIR=/home/foiki/src/Webserver/www
 PORT=1338
 INDEX=/index.html
 LOG=/var/log/test

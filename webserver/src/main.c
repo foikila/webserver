@@ -21,7 +21,7 @@
 // Definitions
 #define BACKLOG 10
 #define BUFF_SIZE 1024
-#define DEBUG 0
+#define DEBUG 1
 #define VERSION 1.1
 
 typedef struct Response {
@@ -46,11 +46,18 @@ void daemononize();
 
 int main(int argc, char **argv) {
     struct Configuration config;
-    readConfiguration((struct Configuration *) &config, ".lab3-config");
+    int port = -1;
+
+
     int c;
 
-    while ((c = getopt(argc, argv, "hp:dlsv")) != -1) {
+    while ((c = getopt(argc, argv, "hp:c:dlsv")) != -1) {
         switch(c) {
+            case 'c': {
+                printf ("Input file: \"%s\"\n", optarg);
+                readConfiguration(&config, optarg);
+                break;
+            }
             case 'h':
                 printf("Usage: webserver_main [-h] [-p] [-d]\n");
                 printf("h\tDisplay help text\np\tUse to set the port\n");
@@ -59,7 +66,7 @@ int main(int argc, char **argv) {
                 exit(0);
                 break;
             case 'p':
-                config.port = atoi(optarg);
+                port = atoi(optarg);
                 break;
             case 'd':
                 /*
@@ -97,6 +104,10 @@ int main(int argc, char **argv) {
                 abort();
             break;
         }
+    }
+
+    if (port != -1) {
+        config.port = port;
     }
 
     printf("uberServer: started on port %d!\n", config.port);
@@ -182,8 +193,6 @@ int main(int argc, char **argv) {
             // builds the request struct with the request uri and method
             buildRequest((struct Request*) &req, requestBuffer);
 
-            // TODO Should be configurable
-            const char* basePath = "www";
             // TODO not sure about the size of the requestFile.
             char* requestFile = malloc(sizeof(char*) * 30);
 
@@ -195,10 +204,10 @@ int main(int argc, char **argv) {
                 requestFile = req.uri;
             }
 
-            char* fullPath = malloc(strlen(basePath) + strlen(requestFile) + 1);
+            char* fullPath = malloc(strlen(config.dir) + strlen(requestFile) + 1);
 
             // Combinds the request file and the requestfile to one path
-            snprintf(fullPath, strlen(basePath) + strlen(requestFile) + 1, "%s%s", basePath, requestFile);
+            snprintf(fullPath, strlen(config.dir) + strlen(requestFile) + 1, "%s%s", config.dir, requestFile);
 
             if (DEBUG) {
                 printf("DEBUG: Requested file path: %s\n", fullPath);
