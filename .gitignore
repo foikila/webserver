@@ -2,4 +2,6 @@
 webserver_main
 npm-debug.log
 *.swp
-
+.idea/
+cmake-build-debug/
+CMakeLists.txt
